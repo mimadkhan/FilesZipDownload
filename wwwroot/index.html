@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcript Files Download</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- No need for Flatpickr CSS anymore -->
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            margin-top: 30px;
+        }
+        h1 {
+            color: #0d6efd;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .btn-download {
+            width: 100%;
+            margin-top: 10px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .date-selection-container {
+            display: flex;
+            gap: 15px;
+        }
+        .date-selection-container .form-group {
+            flex: 1;
+        }
+        .clear-date-btn {
+            margin-top: 5px;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+        }
+        /* Dropdown styles */
+        .filter-info {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #0d6efd;
+        }
+        .selected-date-info {
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: #0d6efd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Files Download</h1>
+        
+        <div class="form-group">
+            <label for="programSelect" class="form-label">Program:</label>
+            <select id="programSelect" class="form-select">
+                <option value="all" selected>All Programs</option>
+                <!-- Programs will be loaded dynamically -->
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Date Filter:</label>
+            <div class="date-selection-container">
+                <div class="form-group">
+                    <label for="yearSelect" class="form-label">Year:</label>
+                    <select id="yearSelect" class="form-select">
+                        <option value="" selected>All Years</option>
+                        <!-- Years will be loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="monthSelect" class="form-label">Month:</label>
+                    <select id="monthSelect" class="form-select" disabled>
+                        <option value="" selected>All Months</option>
+                        <!-- Months will be loaded dynamically -->
+                    </select>
+                </div>
+            </div>
+            <div id="dateFilterInfo" class="filter-info"></div>
+            <button id="clearDateBtn" class="btn btn-sm btn-outline-secondary clear-date-btn">Clear Date Filter</button>
+        </div>
+        
+        <button id="downloadBtn" class="btn btn-primary btn-download">Download Files</button>
+        
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Preparing your download...</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Variables to store selected date
+            let selectedYear = null;
+            let selectedMonth = null;
+            const yearSelect = document.getElementById('yearSelect');
+            const monthSelect = document.getElementById('monthSelect');
+            const dateFilterInfo = document.getElementById('dateFilterInfo');
+            
+            // Function to update the filter info display
+            function updateFilterInfo() {
+                if (selectedYear) {
+                    let filterText = `Filtering by: ${selectedYear}`;
+                    if (selectedMonth) {
+                        const monthName = new Date(2000, selectedMonth - 1, 1).toLocaleString('default', { month: 'long' });
+                        filterText += ` / ${monthName}`;
+                    }
+                    dateFilterInfo.textContent = filterText;
+                } else {
+                    dateFilterInfo.textContent = '';
+                }
+            }
+            
+            // Year selection change handler
+            yearSelect.addEventListener('change', function() {
+                const year = this.value;
+                
+                // Reset month selection
+                monthSelect.innerHTML = '<option value="" selected>All Months</option>';
+                
+                if (year) {
+                    selectedYear = parseInt(year);
+                    monthSelect.disabled = false;
+                    
+                    // Load available months for the selected year
+                    fetch(`/api/Files/available-months?year=${year}`)
+                        .then(response => response.json())
+                        .then(months => {
+                            months.forEach(month => {
+                                const option = document.createElement('option');
+                                option.value = month.monthNumber;
+                                option.textContent = month.monthName;
+                                monthSelect.appendChild(option);
+                            });
+                        })
+                        .catch(error => console.error('Error loading months:', error));
+                } else {
+                    selectedYear = null;
+                    monthSelect.disabled = true;
+                }
+                
+                selectedMonth = null;
+                updateFilterInfo();
+            });
+            
+            // Month selection change handler
+            monthSelect.addEventListener('change', function() {
+                const month = this.value;
+                if (month) {
+                    selectedMonth = parseInt(month);
+                } else {
+                    selectedMonth = null;
+                }
+                updateFilterInfo();
+            });
+            
+            // Clear date button
+            document.getElementById('clearDateBtn').addEventListener('click', function() {
+                yearSelect.value = '';
+                monthSelect.value = '';
+                monthSelect.disabled = true;
+                selectedYear = null;
+                selectedMonth = null;
+                dateFilterInfo.textContent = '';
+            });
+            
+            // Load available years
+            fetch('/api/Files/available-years')
+                .then(response => response.json())
+                .then(years => {
+                    years.forEach(year => {
+                        const option = document.createElement('option');
+                        option.value = year;
+                        option.textContent = year;
+                        yearSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading years:', error));
+
+            // Load available programs
+            fetch('/api/Files/available-programs')
+                .then(response => response.json())
+                .then(programs => {
+                    const programSelect = document.getElementById('programSelect');
+                    programs.forEach(program => {
+                        const option = document.createElement('option');
+                        option.value = program;
+                        option.textContent = program;
+                        programSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading programs:', error));
+
+            // Download button click
+            document.getElementById('downloadBtn').addEventListener('click', function() {
+                const program = document.getElementById('programSelect').value;
+                const year = yearSelect.value ? parseInt(yearSelect.value) : null;
+                const month = monthSelect.value ? parseInt(monthSelect.value) : null;
+                
+                // Show loading indicator
+                document.getElementById('loading').style.display = 'block';
+                
+                // Build URL with query parameters
+                let url = '/api/Files/download-filtered-zip?';
+                const params = [];
+                
+                if (program && program !== 'all') {
+                    params.push(`program=${encodeURIComponent(program)}`);
+                }
+                
+                if (year) {
+                    params.push(`year=${encodeURIComponent(year)}`);
+                    
+                    if (month) {
+                        params.push(`month=${encodeURIComponent(month)}`);
+                    }
+                }
+                
+                url += params.join('&');
+                
+                // Trigger download
+                window.location.href = url;
+                
+                // Hide loading indicator after a delay
+                setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                }, 3000);
+            });
+        });
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
