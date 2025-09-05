@@ -1,4 +1,6 @@
 using FilesZipDownload.Models;
+using FilesZipDownload.Services;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
@@ -22,6 +24,20 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
+// Configure request size limits for large file uploads
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = 100_000_000; // 100MB
+});
+
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = 100_000_000; // 100MB
+});
+
+// Register Excel import service
+builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
 
 // Add Swagger/OpenAPI support
 builder.Services.AddEndpointsApiExplorer();
